@@ -1,0 +1,205 @@
+mode: restart
+blueprint:
+  name: IKEA BILRESA Dual Button - Light Control
+  author: hisbaan
+  description: |
+    Specialized automation blueprint for the IKEA BILRESA Dual Button remote in Zigbee mode over Z2M.
+    Controls a light, group, or area with single press, double press, and smooth continuous brightness control.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/hisbaan/homeassistant/refs/heads/main/blueprints/automation/ikea-bilresa-dual-button-light-control.yaml
+
+  input:
+    setup:
+      name: ⚙️ Setup
+      collapsed: true
+      input:
+        remote_device:
+          name: Remote Device
+          description: The IKEA BILRESA dual-button remote.
+          selector:
+            device:
+              filter:
+                - integration: mqtt
+
+        light_target:
+          name: Light Target
+          description: The light, light group, or area to control.
+          selector:
+            target:
+              entity:
+                domain: light
+
+    brightness:
+      name: 💡 Brightness Control
+      collapsed: true
+      input:
+        brightness_step:
+          name: Brightness Step (%)
+          description: How much to change brightness per interval while holding.
+          default: 3
+          selector:
+            number:
+              min: 1
+              max: 20
+              step: 1
+              unit_of_measurement: "%"
+
+        brightness_interval:
+          name: Brightness Interval (seconds)
+          description: How frequently the brightness updates while holding.
+          default: 0.3
+          selector:
+            number:
+              min: 0.05
+              max: 2
+              step: 0.05
+              unit_of_measurement: s
+
+        brightness_max_iterations:
+          name: Max Iterations
+          description: Safety limit on the number of brightness steps while holding.
+          default: 100
+          selector:
+            number:
+              min: 1
+              max: 1000
+              step: 1
+
+trigger:
+  - domain: mqtt
+    device_id: !input remote_device
+    type: action
+    subtype: "on"
+    trigger: device
+    id: button1_single
+
+  - domain: mqtt
+    device_id: !input remote_device
+    type: action
+    subtype: on_double
+    trigger: device
+    id: button1_double
+
+  - domain: mqtt
+    device_id: !input remote_device
+    type: action
+    subtype: brightness_move_up
+    trigger: device
+    id: button1_long_press
+
+  - domain: mqtt
+    device_id: !input remote_device
+    type: action
+    subtype: "off"
+    trigger: device
+    id: button2_single
+
+  - domain: mqtt
+    device_id: !input remote_device
+    type: action
+    subtype: off_double
+    trigger: device
+    id: button2_double
+
+  - domain: mqtt
+    device_id: !input remote_device
+    type: action
+    subtype: brightness_move_down
+    trigger: device
+    id: button2_long_press
+
+  - domain: mqtt
+    device_id: !input remote_device
+    type: action
+    subtype: brightness_stop
+    trigger: device
+    id: long_release
+
+condition: []
+
+action:
+  - variables:
+      light_target: !input light_target
+      brightness_step: !input brightness_step
+      brightness_max_iterations: !input brightness_max_iterations
+
+  - choose:
+      # Button 1 - Single: turn on
+      - conditions:
+          - condition: trigger
+            id: button1_single
+        sequence:
+          - action: light.turn_on
+            target: !input light_target
+            data: {}
+
+      # Button 1 - Double: full brightness
+      - conditions:
+          - condition: trigger
+            id: button1_double
+        sequence:
+          - action: light.turn_on
+            target: !input light_target
+            data:
+              brightness_pct: 100
+
+      # Button 1 - Long press: ramp brightness up
+      - conditions:
+          - condition: trigger
+            id: button1_long_press
+        sequence:
+          - repeat:
+              while:
+                - condition: template
+                  value_template: >
+                    {{ repeat.index <= brightness_max_iterations }}
+              sequence:
+                - action: light.turn_on
+                  target: !input light_target
+                  data:
+                    brightness_step_pct: "{{ brightness_step }}"
+                - delay:
+                    seconds: !input brightness_interval
+
+      # Button 2 - Single: turn off
+      - conditions:
+          - condition: trigger
+            id: button2_single
+        sequence:
+          - action: light.turn_off
+            target: !input light_target
+            data: {}
+
+      # Button 2 - Double: minimum brightness
+      - conditions:
+          - condition: trigger
+            id: button2_double
+        sequence:
+          - action: light.turn_on
+            target: !input light_target
+            data:
+              brightness_pct: 10
+
+      # Button 2 - Long press: ramp brightness down
+      - conditions:
+          - condition: trigger
+            id: button2_long_press
+        sequence:
+          - repeat:
+              while:
+                - condition: template
+                  value_template: >
+                    {{ repeat.index <= brightness_max_iterations }}
+              sequence:
+                - action: light.turn_on
+                  target: !input light_target
+                  data:
+                    brightness_step_pct: "{{ brightness_step | int * -1 }}"
+                - delay:
+                    seconds: !input brightness_interval
+
+      # brightness_stop: automation restarts, killing any active repeat loop
+      - conditions:
+          - condition: trigger
+            id: long_release
+        sequence: []
