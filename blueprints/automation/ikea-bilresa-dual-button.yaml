@@ -1,0 +1,181 @@
+mode: restart
+blueprint:
+  name: IKEA BILRESA Dual Button
+  author: hisbaan
+  description: |
+    Automation blueprint for IKEA BILRESA Dual Button remote when used in Zigbee mode over Zigbee2MQTT.
+    Supports single press, double press, long press (on press), and long press (on release) for each button.
+  # Note: "while holding" is not supported in this mode as the device does not emit continuous hold events.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/hisbaan/homeassistant/refs/heads/main/blueprints/automation/ikea-bilresa-dual-button.yaml
+
+  input:
+    setup:
+      name: ⚙️ Button Setup
+      description: >
+        Select the IKEA BILRESA device.
+      collapsed: true
+      input:
+        remote_device:
+          name: Remote Device
+          description: >
+            Select the IKEA BILRESA dual-button remote device.
+          selector:
+            device:
+              filter:
+                - integration: mqtt
+
+    button1:
+      name: 1️⃣ Button 1 Actions
+      description: Define actions for Button 1 (the ON / brightness up button).
+      collapsed: true
+      input:
+        button1_single:
+          name: Single Press
+          description: Action for Button 1 single press.
+          default: []
+          selector:
+            action: {}
+
+        button1_double:
+          name: Double Press
+          description: Action for Button 1 double press.
+          default: []
+          selector:
+            action: {}
+
+        button1_long_press:
+          name: Long Press (on press)
+          description: Action triggered when Button 1 is held down.
+          default: []
+          selector:
+            action: {}
+
+        button1_long_release:
+          name: Long Press (on release)
+          description: Action triggered when Button 1 is released after a long press.
+          default: []
+          selector:
+            action: {}
+
+    button2:
+      name: 2️⃣ Button 2 Actions
+      description: Define actions for Button 2 (the OFF / brightness down button).
+      collapsed: true
+      input:
+        button2_single:
+          name: Single Press
+          description: Action for Button 2 single press.
+          default: []
+          selector:
+            action: {}
+
+        button2_double:
+          name: Double Press
+          description: Action for Button 2 double press.
+          default: []
+          selector:
+            action: {}
+
+        button2_long_press:
+          name: Long Press (on press)
+          description: Action triggered when Button 2 is held down.
+          default: []
+          selector:
+            action: {}
+
+        button2_long_release:
+          name: Long Press (on release)
+          description: Action triggered when Button 2 is released after a long press.
+          default: []
+          selector:
+            action: {}
+
+trigger:
+  - domain: mqtt
+    device_id: !input remote_device
+    type: action
+    subtype: "on"
+    trigger: device
+    id: button1_single
+
+  - domain: mqtt
+    device_id: !input remote_device
+    type: action
+    subtype: on_double
+    trigger: device
+    id: button1_double
+
+  - domain: mqtt
+    device_id: !input remote_device
+    type: action
+    subtype: brightness_move_up
+    trigger: device
+    id: button1_long_press
+
+  - domain: mqtt
+    device_id: !input remote_device
+    type: action
+    subtype: brightness_stop
+    trigger: device
+    id: button1_long_release
+
+  - domain: mqtt
+    device_id: !input remote_device
+    type: action
+    subtype: "off"
+    trigger: device
+    id: button2_single
+
+  - domain: mqtt
+    device_id: !input remote_device
+    type: action
+    subtype: off_double
+    trigger: device
+    id: button2_double
+
+  - domain: mqtt
+    device_id: !input remote_device
+    type: action
+    subtype: brightness_move_down
+    trigger: device
+    id: button2_long_press
+
+condition: []
+
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: button1_single
+        sequence: !input button1_single
+
+      - conditions:
+          - condition: trigger
+            id: button1_double
+        sequence: !input button1_double
+
+      - conditions:
+          - condition: trigger
+            id: button1_long_press
+        sequence: !input button1_long_press
+
+      - conditions:
+          - condition: trigger
+            id: button1_long_release
+        sequence: !input button1_long_release
+
+      - conditions:
+          - condition: trigger
+            id: button2_single
+        sequence: !input button2_single
+
+      - conditions:
+          - condition: trigger
+            id: button2_double
+        sequence: !input button2_double
+
+      - conditions:
+          - condition: trigger
+            id: button2_long_press
+        sequence: !input button2_long_press
