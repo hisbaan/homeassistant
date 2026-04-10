@@ -1,0 +1,79 @@
+mode: single
+blueprint:
+  name: Presence Lighting
+  author: hisbaan
+  description: |
+    Turns lights off when everyone leaves home, and turns lights on when someone
+    arrives or the sun sets — but only if someone is home and the sun has set.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/hisbaan/homeassistant/refs/heads/main/blueprints/automation/presence-lighting.yaml
+
+  input:
+    setup:
+      name: ⚙️ Setup
+      collapsed: true
+      input:
+        light_target:
+          name: Light Target
+          description: The light, light group, or area to control.
+          selector:
+            target:
+              entity:
+                domain: light
+
+        presence_entity:
+          name: Presence Zone
+          description: >
+            Entity that tracks how many people are home. Typically zone.home.
+          default: zone.home
+          selector:
+            entity:
+              domain: zone
+
+trigger:
+  - trigger: numeric_state
+    entity_id: !input presence_entity
+    below: 1
+    id: everyone_left
+
+  - trigger: numeric_state
+    entity_id: !input presence_entity
+    above: 0
+    id: someone_arrived
+
+  - trigger: state
+    entity_id: sun.sun
+    to: "below_horizon"
+    id: sun_set
+
+condition: []
+
+action:
+  - choose:
+      # Everyone left -> turn off lights unconditionally
+      - conditions:
+          - condition: trigger
+            id: everyone_left
+        sequence:
+          - action: light.turn_off
+            target: !input light_target
+            data: {}
+
+      # Someone arrived or sun set -> turn on lights only if home and past sunset
+      - conditions:
+          - condition: or
+            conditions:
+              - condition: trigger
+                id: someone_arrived
+              - condition: trigger
+                id: sun_set
+          - condition: numeric_state
+            entity_id: !input presence_entity
+            above: 0
+          - condition: state
+            entity_id: sun.sun
+            state: "below_horizon"
+        sequence:
+          - action: light.turn_on
+            target: !input light_target
+            data: {}
