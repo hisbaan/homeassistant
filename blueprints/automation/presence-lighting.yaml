@@ -4,7 +4,8 @@ blueprint:
   author: hisbaan
   description: |
     Turns lights off when everyone leaves home, and turns lights on when someone
-    arrives or the sun sets — but only if someone is home and the sun has set.
+    arrives or when the configured pre-sunset lighting window begins - but only
+    if someone is home and it is within the lights-on window.
   domain: automation
   source_url: https://raw.githubusercontent.com/hisbaan/homeassistant/refs/heads/main/blueprints/automation/presence-lighting.yaml
 
@@ -30,6 +31,23 @@ blueprint:
             entity:
               domain: zone
 
+        sunset_offset_minutes:
+          name: Sunset Offset
+          description: >
+            Minutes before sunset to start the lights-on window. Use 0 to turn
+            lights on at sunset.
+          default: 30
+          selector:
+            number:
+              min: 0
+              max: 180
+              step: 1
+              unit_of_measurement: min
+              mode: box
+
+trigger_variables:
+  sunset_offset_minutes: !input sunset_offset_minutes
+
 trigger:
   - trigger: numeric_state
     entity_id: !input presence_entity
@@ -41,14 +59,26 @@ trigger:
     above: 0
     id: someone_arrived
 
-  - trigger: state
-    entity_id: sun.sun
-    to: "below_horizon"
-    id: sun_set
+  - trigger: template
+    value_template: >
+      {% set next_setting = state_attr('sun.sun', 'next_setting') %}
+      {% set sunset = as_timestamp(next_setting) if next_setting else none %}
+      {% set offset_seconds = (sunset_offset_minutes | int(30)) * 60 %}
+      {{
+        is_state('sun.sun', 'below_horizon')
+        or (
+          is_state('sun.sun', 'above_horizon')
+          and sunset is not none
+          and (sunset - offset_seconds) <= as_timestamp(now()) < sunset
+        )
+      }}
+    id: lights_on_time
 
 condition: []
 
 action:
+  - variables:
+      sunset_offset_minutes: !input sunset_offset_minutes
   - choose:
       # Everyone left -> turn off lights unconditionally
       - conditions:
@@ -59,20 +89,32 @@ action:
             target: !input light_target
             data: {}
 
-      # Someone arrived or sun set -> turn on lights only if home and past sunset
+      # Someone arrived or the lights-on window starts -> turn on lights only if home
       - conditions:
           - condition: or
             conditions:
               - condition: trigger
                 id: someone_arrived
               - condition: trigger
-                id: sun_set
+                id: lights_on_time
           - condition: numeric_state
             entity_id: !input presence_entity
             above: 0
-          - condition: state
-            entity_id: sun.sun
-            state: "below_horizon"
+          - condition: or
+            conditions:
+              - condition: state
+                entity_id: sun.sun
+                state: "below_horizon"
+              - condition: template
+                value_template: >
+                  {% set next_setting = state_attr('sun.sun', 'next_setting') %}
+                  {% set sunset = as_timestamp(next_setting) if next_setting else none %}
+                  {% set offset_seconds = (sunset_offset_minutes | int(30)) * 60 %}
+                  {{
+                    is_state('sun.sun', 'above_horizon')
+                    and sunset is not none
+                    and (sunset - offset_seconds) <= as_timestamp(now()) < sunset
+                  }}
         sequence:
           - action: light.turn_on
             target: !input light_target
