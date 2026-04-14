@@ -1,0 +1,89 @@
+blueprint:
+  name: "WiFi BSSID Presence Tracker"
+  author: hisbaan
+  description: >
+    Creates a device tracker based on a WiFi BSSID sensor from the HA Companion app.
+    Handles arrival, departure, and initialization on HA restart.
+    Pair the resulting device_tracker with a Person entity for presence detection.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/hisbaan/homeassistant/refs/heads/main/blueprints/automation/wifi-presense-tracker.yaml
+  input:
+    bssid_sensor:
+      name: WiFi BSSID Sensor
+      description: The BSSID sensor from your HA Companion app (e.g. sensor.pixel_10_pro_wi_fi_bssid)
+      selector:
+        entity:
+          domain: sensor
+    home_bssid_value:
+      name: Home Network BSSID Value
+      description: >
+        The value your BSSID sensor reports when at home. If you've used BSSID
+        mapping in the Companion app, this will be your mapped name (e.g. "condonet").
+        Otherwise it will be a MAC address (e.g. "aa:bb:cc:dd:ee:ff").
+      selector:
+        text:
+    tracker_id:
+      name: Device Tracker ID
+      description: >
+        A unique ID for the device tracker entity that will be created.
+        Use lowercase letters, numbers, and underscores only.
+        The entity will be created as device_tracker.<your_value_here>.
+      selector:
+        text:
+
+variables:
+  bssid_sensor: !input bssid_sensor
+  home_bssid_value: !input home_bssid_value
+  tracker_id: !input tracker_id
+
+trigger:
+  - platform: state
+    entity_id: !input bssid_sensor
+    to: !input home_bssid_value
+    id: arrived
+
+  - platform: state
+    entity_id: !input bssid_sensor
+    from: !input home_bssid_value
+    id: left
+
+  - platform: homeassistant
+    event: start
+    id: startup
+
+action:
+  - choose:
+      - conditions:
+          - condition: trigger
+            id: arrived
+        sequence:
+          - service: device_tracker.see
+            data:
+              dev_id: "{{ tracker_id }}"
+              location_name: home
+
+      - conditions:
+          - condition: trigger
+            id: left
+        sequence:
+          - service: device_tracker.see
+            data:
+              dev_id: "{{ tracker_id }}"
+              location_name: not_home
+
+      - conditions:
+          - condition: trigger
+            id: startup
+        sequence:
+          - service: device_tracker.see
+            data:
+              dev_id: "{{ tracker_id }}"
+              location_name: >
+                {% if states(bssid_sensor) == home_bssid_value %}
+                  home
+                {% else %}
+                  not_home
+                {% endif %}
+
+mode: single
+max_exceeded: silent
