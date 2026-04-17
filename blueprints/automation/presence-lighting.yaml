@@ -6,7 +6,7 @@ blueprint:
     Turns configured lights off when everyone leaves home, and turns configured
     lights on when someone arrives or when the configured pre-sunset lighting
     window begins - but only if someone is home and it is within the lights-on
-    window.
+    window. Supports additional custom actions for leave and arrive events.
   domain: automation
   source_url: https://raw.githubusercontent.com/hisbaan/homeassistant/refs/heads/main/blueprints/automation/presence-lighting.yaml
 
@@ -54,6 +54,24 @@ blueprint:
               unit_of_measurement: min
               mode: box
 
+    actions:
+      name: 🎬 Additional Actions
+      collapsed: true
+      input:
+        leave_actions:
+          name: Leave Actions
+          description: Additional actions to run after turning off the configured leave lights.
+          default: []
+          selector:
+            action: {}
+
+        arrive_actions:
+          name: Arrive Actions
+          description: Additional actions to run after turning on the configured arrival lights.
+          default: []
+          selector:
+            action: {}
+
 trigger_variables:
   sunset_offset_minutes: !input sunset_offset_minutes
 
@@ -97,6 +115,7 @@ action:
           - action: light.turn_off
             target: !input lights_off_target
             data: {}
+          - sequence: !input leave_actions
 
       # Someone arrived or the lights-on window starts -> turn on lights only if home
       - conditions:
@@ -128,3 +147,4 @@ action:
           - action: light.turn_on
             target: !input lights_on_target
             data: {}
+          - sequence: !input arrive_actions
