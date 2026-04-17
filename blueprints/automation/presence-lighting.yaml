@@ -3,9 +3,10 @@ blueprint:
   name: Presence Lighting
   author: hisbaan
   description: |
-    Turns lights off when everyone leaves home, and turns lights on when someone
-    arrives or when the configured pre-sunset lighting window begins - but only
-    if someone is home and it is within the lights-on window.
+    Turns configured lights off when everyone leaves home, and turns configured
+    lights on when someone arrives or when the configured pre-sunset lighting
+    window begins - but only if someone is home and it is within the lights-on
+    window.
   domain: automation
   source_url: https://raw.githubusercontent.com/hisbaan/homeassistant/refs/heads/main/blueprints/automation/presence-lighting.yaml
 
@@ -14,9 +15,17 @@ blueprint:
       name: ⚙️ Setup
       collapsed: true
       input:
-        light_target:
-          name: Light Target
-          description: The light, light group, or area to control.
+        lights_on_target:
+          name: Lights To Turn On
+          description: The light, light group, or area to turn on when someone arrives or the pre-sunset window begins.
+          selector:
+            target:
+              entity:
+                domain: light
+
+        lights_off_target:
+          name: Lights To Turn Off
+          description: The light, light group, or area to turn off when everyone leaves home.
           selector:
             target:
               entity:
@@ -86,7 +95,7 @@ action:
             id: everyone_left
         sequence:
           - action: light.turn_off
-            target: !input light_target
+            target: !input lights_off_target
             data: {}
 
       # Someone arrived or the lights-on window starts -> turn on lights only if home
@@ -117,5 +126,5 @@ action:
                   }}
         sequence:
           - action: light.turn_on
-            target: !input light_target
+            target: !input lights_on_target
             data: {}
