@@ -9,29 +9,13 @@ blueprint:
 
   input:
     setup:
-      name: Button Events
-      description: Select the three ESPHome event entities exposed by the switch.
+      name: Button Event
+      description: Select the combined ESPHome event entity exposed by the switch.
       collapsed: true
       input:
-        button_1_event:
-          name: Button 1 Event
-          description: Select the event entity for Button 1 (top / up).
-          selector:
-            entity:
-              filter:
-                - domain: event
-
-        button_2_event:
-          name: Button 2 Event
-          description: Select the event entity for Button 2 (middle / toggle).
-          selector:
-            entity:
-              filter:
-                - domain: event
-
-        button_3_event:
-          name: Button 3 Event
-          description: Select the event entity for Button 3 (bottom / down).
+        button_event:
+          name: Button Event
+          description: Select the combined event entity for the switch.
           selector:
             entity:
               filter:
@@ -128,119 +112,75 @@ mode: restart
 
 trigger:
   - platform: state
-    entity_id: !input button_1_event
+    entity_id: !input button_event
     not_from:
       - unknown
       - unavailable
     not_to:
       - unknown
       - unavailable
-    id: button_1
-
-  - platform: state
-    entity_id: !input button_2_event
-    not_from:
-      - unknown
-      - unavailable
-    not_to:
-      - unknown
-      - unavailable
-    id: button_2
-
-  - platform: state
-    entity_id: !input button_3_event
-    not_from:
-      - unknown
-      - unavailable
-    not_to:
-      - unknown
-      - unavailable
-    id: button_3
+    id: button_event
 
 condition: []
 
 action:
   - choose:
       - conditions:
-          - condition: trigger
-            id: button_1
           - condition: template
-            value_template: "{{ trigger.to_state.attributes.event_type == 'single_pressed' }}"
+            value_template: "{{ trigger.to_state.attributes.event_type == 'button_1_single_pressed' }}"
         sequence: !input button1_single
 
       - conditions:
-          - condition: trigger
-            id: button_1
           - condition: template
-            value_template: "{{ trigger.to_state.attributes.event_type == 'double_pressed' }}"
+            value_template: "{{ trigger.to_state.attributes.event_type == 'button_1_double_pressed' }}"
         sequence: !input button1_double
 
       - conditions:
-          - condition: trigger
-            id: button_1
           - condition: template
-            value_template: "{{ trigger.to_state.attributes.event_type == 'long_hold_started' }}"
+            value_template: "{{ trigger.to_state.attributes.event_type == 'button_1_long_hold_started' }}"
         sequence: !input button1_long_hold_started
 
       - conditions:
-          - condition: trigger
-            id: button_1
           - condition: template
-            value_template: "{{ trigger.to_state.attributes.event_type == 'long_hold_stopped' }}"
+            value_template: "{{ trigger.to_state.attributes.event_type == 'button_1_long_hold_stopped' }}"
         sequence: !input button1_long_hold_stopped
 
       - conditions:
-          - condition: trigger
-            id: button_2
           - condition: template
-            value_template: "{{ trigger.to_state.attributes.event_type == 'single_pressed' }}"
+            value_template: "{{ trigger.to_state.attributes.event_type == 'button_2_single_pressed' }}"
         sequence: !input button2_single
 
       - conditions:
-          - condition: trigger
-            id: button_2
           - condition: template
-            value_template: "{{ trigger.to_state.attributes.event_type == 'double_pressed' }}"
+            value_template: "{{ trigger.to_state.attributes.event_type == 'button_2_double_pressed' }}"
         sequence: !input button2_double
 
       - conditions:
-          - condition: trigger
-            id: button_2
           - condition: template
-            value_template: "{{ trigger.to_state.attributes.event_type == 'long_hold_started' }}"
+            value_template: "{{ trigger.to_state.attributes.event_type == 'button_2_long_hold_started' }}"
         sequence: !input button2_long_hold_started
 
       - conditions:
-          - condition: trigger
-            id: button_2
           - condition: template
-            value_template: "{{ trigger.to_state.attributes.event_type == 'long_hold_stopped' }}"
+            value_template: "{{ trigger.to_state.attributes.event_type == 'button_2_long_hold_stopped' }}"
         sequence: !input button2_long_hold_stopped
 
       - conditions:
-          - condition: trigger
-            id: button_3
           - condition: template
-            value_template: "{{ trigger.to_state.attributes.event_type == 'single_pressed' }}"
+            value_template: "{{ trigger.to_state.attributes.event_type == 'button_3_single_pressed' }}"
         sequence: !input button3_single
 
       - conditions:
-          - condition: trigger
-            id: button_3
           - condition: template
-            value_template: "{{ trigger.to_state.attributes.event_type == 'double_pressed' }}"
+            value_template: "{{ trigger.to_state.attributes.event_type == 'button_3_double_pressed' }}"
         sequence: !input button3_double
 
       - conditions:
-          - condition: trigger
-            id: button_3
           - condition: template
-            value_template: "{{ trigger.to_state.attributes.event_type == 'long_hold_started' }}"
+            value_template: "{{ trigger.to_state.attributes.event_type == 'button_3_long_hold_started' }}"
         sequence: !input button3_long_hold_started
 
       - conditions:
-          - condition: trigger
-            id: button_3
           - condition: template
-            value_template: "{{ trigger.to_state.attributes.event_type == 'long_hold_stopped' }}"
+            value_template: "{{ trigger.to_state.attributes.event_type == 'button_3_long_hold_stopped' }}"
         sequence: !input button3_long_hold_stopped
