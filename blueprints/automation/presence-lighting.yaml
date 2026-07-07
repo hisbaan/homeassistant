@@ -79,33 +79,12 @@ blueprint:
             action: {}
 
 trigger_variables:
-  presence_entities: !input presence_entities
   sunset_offset_minutes: !input sunset_offset_minutes
 
 trigger:
-  - trigger: template
-    value_template: >
-      {% set ns = namespace(present=false) %}
-      {% for entity_id in presence_entities %}
-        {% set state = states(entity_id) %}
-        {% if state == 'on' or (state | int(0)) > 0 %}
-          {% set ns.present = true %}
-        {% endif %}
-      {% endfor %}
-      {{ ns.present }}
-    id: someone_arrived
-
-  - trigger: template
-    value_template: >
-      {% set ns = namespace(present=false) %}
-      {% for entity_id in presence_entities %}
-        {% set state = states(entity_id) %}
-        {% if state == 'on' or (state | int(0)) > 0 %}
-          {% set ns.present = true %}
-        {% endif %}
-      {% endfor %}
-      {{ not ns.present }}
-    id: everyone_left
+  - trigger: state
+    entity_id: !input presence_entities
+    id: presence_changed
 
   - trigger: template
     value_template: >
@@ -136,12 +115,26 @@ action:
           {% endif %}
         {% endfor %}
         {{ ns.present }}
+      presence_detected_before: >
+        {% set ns = namespace(present=false) %}
+        {% for entity_id in presence_entities %}
+          {% set state = states(entity_id) %}
+          {% if trigger.entity_id is defined and trigger.entity_id == entity_id and trigger.from_state is not none %}
+            {% set state = trigger.from_state.state %}
+          {% endif %}
+          {% if state == 'on' or (state | int(0)) > 0 %}
+            {% set ns.present = true %}
+          {% endif %}
+        {% endfor %}
+        {{ ns.present }}
       sunset_offset_minutes: !input sunset_offset_minutes
   - choose:
       # Everyone left -> turn off lights unconditionally
       - conditions:
           - condition: trigger
-            id: everyone_left
+            id: presence_changed
+          - condition: template
+            value_template: "{{ presence_detected_before | bool(false) and not (presence_detected | bool(false)) }}"
         sequence:
           - action: light.turn_off
             target: !input lights_off_target
@@ -152,12 +145,16 @@ action:
       - conditions:
           - condition: or
             conditions:
-              - condition: trigger
-                id: someone_arrived
+              - condition: and
+                conditions:
+                  - condition: trigger
+                    id: presence_changed
+                  - condition: template
+                    value_template: "{{ not (presence_detected_before | bool(false)) and (presence_detected | bool(false)) }}"
               - condition: trigger
                 id: lights_on_time
           - condition: template
-            value_template: "{{ presence_detected }}"
+            value_template: "{{ presence_detected | bool(false) }}"
           - condition: or
             conditions:
               - condition: state
