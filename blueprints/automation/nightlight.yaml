@@ -1,0 +1,179 @@
+mode: single
+max_exceeded: silent
+blueprint:
+  name: Nightlight
+  author: hisbaan
+  description: |
+    Companion to Presence Lighting. Between a configurable start and stop
+    time, turns configured lights on when any presence sensor detects
+    presence and turns them off (after an optional delay) once every
+    sensor is clear or the window ends. If any of the configured lights
+    is already on when presence is detected - turned on manually or by
+    another automation - this blueprint does nothing and never turns
+    them off. Supports additional custom actions for presence detected
+    and presence cleared events.
+  domain: automation
+  source_url: https://raw.githubusercontent.com/hisbaan/homeassistant/refs/heads/main/blueprints/automation/nightlight.yaml
+
+  input:
+    setup:
+      name: ⚙️ Setup
+      collapsed: true
+      input:
+        presence_entities:
+          name: Presence Sensors
+          description: >
+            Binary sensors to use for presence. Presence is detected when
+            any sensor is on, and cleared when every sensor is off.
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: binary_sensor
+
+        lights:
+          name: Lights
+          description: >
+            The lights or light groups to control. If any of these is
+            already on when presence is detected, the automation does
+            nothing.
+          selector:
+            entity:
+              multiple: true
+              filter:
+                - domain: light
+
+        start_time:
+          name: Start Time
+          description: Time the nightlight window begins.
+          default: "22:00:00"
+          selector:
+            time: {}
+
+        end_time:
+          name: Stop Time
+          description: >
+            Time the nightlight window ends. The window may cross midnight.
+            Lights turned on by this automation are turned off at this time.
+          default: "06:00:00"
+          selector:
+            time: {}
+
+        brightness_pct:
+          name: Brightness
+          description: Brightness to use when turning the lights on.
+          default: 10
+          selector:
+            number:
+              min: 1
+              max: 100
+              step: 1
+              unit_of_measurement: "%"
+              mode: slider
+
+        clear_delay:
+          name: Clear Delay
+          description: >
+            Seconds to wait after every presence sensor clears before
+            turning the lights off. Presence detected during the delay
+            cancels the turn-off.
+          default: 0
+          selector:
+            number:
+              min: 0
+              max: 600
+              step: 1
+              unit_of_measurement: s
+              mode: box
+
+    actions:
+      name: 🎬 Additional Actions
+      collapsed: true
+      input:
+        presence_detected_actions:
+          name: Presence Detected Actions
+          description: Additional actions to run after turning the lights on.
+          default: []
+          selector:
+            action: {}
+
+        presence_cleared_actions:
+          name: Presence Cleared Actions
+          description: Additional actions to run after turning the lights off.
+          default: []
+          selector:
+            action: {}
+
+trigger:
+  - trigger: state
+    entity_id: !input presence_entities
+    to: "on"
+
+condition:
+  - condition: time
+    after: !input start_time
+    before: !input end_time
+
+action:
+  - variables:
+      presence_entities: !input presence_entities
+      lights: !input lights
+      clear_delay: !input clear_delay
+
+  # Do nothing if any configured light is already on - it was turned on
+  # manually or by another automation, so it is not ours to turn off.
+  - condition: template
+    value_template: "{{ lights | select('is_state', 'on') | list | count == 0 }}"
+
+  - action: light.turn_on
+    target:
+      entity_id: !input lights
+    data:
+      brightness_pct: !input brightness_pct
+  - sequence: !input presence_detected_actions
+
+  # This run owns the lights until they are turned off again, so further
+  # presence triggers are ignored (mode: single). Wait until either every
+  # sensor stays clear for the configured delay or the window ends.
+  - repeat:
+      sequence:
+        - wait_for_trigger:
+            - trigger: state
+              entity_id: !input presence_entities
+              to: "off"
+            - trigger: time
+              at: !input end_time
+
+        # Window ended -> turn off and stop regardless of presence
+        - if:
+            - condition: template
+              value_template: "{{ wait.trigger.platform == 'time' }}"
+          then:
+            - action: light.turn_off
+              target:
+                entity_id: !input lights
+              data: {}
+            - sequence: !input presence_cleared_actions
+            - stop: Nightlight window ended
+
+        # Every sensor is clear -> wait out the delay, watching for presence
+        # to return, which cancels the pending turn-off and repeats the loop
+        - if:
+            - condition: template
+              value_template: "{{ presence_entities | select('is_state', 'on') | list | count == 0 }}"
+            - condition: template
+              value_template: "{{ clear_delay | int(0) > 0 }}"
+          then:
+            - wait_template: "{{ presence_entities | select('is_state', 'on') | list | count > 0 }}"
+              timeout:
+                seconds: !input clear_delay
+              continue_on_timeout: true
+      until:
+        - condition: template
+          value_template: "{{ presence_entities | select('is_state', 'on') | list | count == 0 }}"
+
+  - action: light.turn_off
+    target:
+      entity_id: !input lights
+    data: {}
+  - sequence: !input presence_cleared_actions
